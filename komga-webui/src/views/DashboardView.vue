@@ -193,6 +193,26 @@
           />
         </template>
       </horizontal-scroller>
+
+      <horizontal-scroller
+        v-if="loaderOnHoldSeries && loaderOnHoldSeries.items.length !== 0"
+        class="mb-4"
+        :tick="loaderOnHoldSeries.tick"
+        @scroll-changed="(percent) => scrollChanged(loaderOnHoldSeries, percent)"
+      >
+        <template v-slot:prepend>
+          <div class="title">On Hold</div>
+        </template>
+        <template v-slot:content>
+          <item-browser :items="loaderOnHoldSeries.items"
+                        nowrap
+                        :edit-function="isAdmin ? singleEditSeries : undefined"
+                        :selected.sync="selectedSeries"
+                        :selectable="selectedBooks.length === 0"
+                        :fixed-item-width="fixedCardWidth"
+          />
+        </template>
+      </horizontal-scroller>
     </v-container>
   </div>
 </template>
@@ -252,6 +272,7 @@ export default Vue.extend({
       loaderOnDeckBooks: undefined as unknown as PageLoader<BookDto>,
       loaderRecentlyReleasedBooks: undefined as unknown as PageLoader<BookDto>,
       loaderRecentlyReadBooks: undefined as unknown as PageLoader<BookDto>,
+      loaderOnHoldSeries: undefined as unknown as PageLoader<BookDto>,
       selectedSeries: [] as SeriesDto[],
       selectedBooks: [] as BookDto[],
     }
@@ -320,7 +341,8 @@ export default Vue.extend({
         this.loaderInProgressBooks?.items.length === 0 &&
         this.loaderOnDeckBooks?.items.length === 0 &&
         this.loaderRecentlyReleasedBooks?.items.length === 0 &&
-        this.loaderRecentlyReadBooks?.items.length === 0
+        this.loaderRecentlyReadBooks?.items.length === 0 &&
+        this.loaderloaderOnHoldSeries?.items.length === 0
     },
     individualLibrary(): boolean {
       return this.libraryId !== LIBRARIES_ALL
@@ -353,6 +375,7 @@ export default Vue.extend({
     readProgressSeriesChanged(event: ReadProgressSeriesSseDto) {
       if (this.loaderUpdatedSeries?.items.some(s => s.id === event.seriesId)) this.reload()
       else if (this.loaderNewSeries?.items.some(s => s.id === event.seriesId)) this.reload()
+      else if (this.loaderOnHoldSeries?.items.some(s => s.id === event.seriesId)) this.reload()
     },
     reload: throttle(function (this: any) {
       this.loadAll(this.libraryId, true)
@@ -387,6 +410,11 @@ export default Vue.extend({
         {},
         (pageable: PageRequest) => this.$komgaSeries.getUpdatedSeries(this.getRequestLibraryId(libraryId), pageable),
       )
+
+      this.loaderOnHoldSeries = new PageLoader<SeriesDto>(
+        {},
+        (pageable: PageRequest) => this.$komgaCollections.getSeries('0ASVECWM4QACQ', pageable),
+      )
     },
     loadAll(libraryId: string, reload: boolean = false) {
       this.loading = true
@@ -403,6 +431,7 @@ export default Vue.extend({
           this.loaderNewSeries.reload(),
           this.loaderUpdatedSeries.reload(),
           this.loaderRecentlyReadBooks.reload(),
+          this.loaderOnHoldSeries.reload(),
         ]).then(() => {
           this.loading = false
         })
@@ -415,6 +444,7 @@ export default Vue.extend({
           this.loaderNewSeries.loadNext(),
           this.loaderUpdatedSeries.loadNext(),
           this.loaderRecentlyReadBooks.loadNext(),
+          this.loaderOnHoldSeries.loadNext(),
         ]).then(() => {
           this.loading = false
         })
